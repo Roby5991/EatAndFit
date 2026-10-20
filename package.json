@@ -1,0 +1,15 @@
+{
+  "name": "eatandfit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EatAndFit: diario alimentare, peso e foto dei check. App Android con i dati sul telefono.",
+  "scripts": { "serve": "npx http-server www -p 8080" },
+  "dependencies": {
+    "@capacitor/android": "7.6.9",
+    "@capacitor/app": "7.1.2",
+    "@capacitor/core": "7.6.9",
+    "@capacitor/filesystem": "7.1.9",
+    "@capacitor/share": "7.0.4"
+  },
+  "devDependencies": { "@capacitor/cli": "7.6.9" }
+}

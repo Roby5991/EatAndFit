@@ -1,0 +1,65 @@
+# Compila l'APK di EatAndFit e lo pubblica come release.
+# Nuova versione: crea un tag "vX.Y.Z" (es. v1.0.1). Le novità della release vengono da NOVITA.md.
+# Segreti richiesti (Settings → Secrets and variables → Actions): KEYSTORE_B64 e KEYSTORE_PASS.
+name: Compila APK
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Numero di versione
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.$GITHUB_RUN_NUMBER"; fi
+          IFS=. read -r MA MI PA <<< "$V"
+          echo "V=$V" >> "$GITHUB_ENV"
+          echo "CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))" >> "$GITHUB_ENV"
+          echo "window.EAF_VERSION = \"$V\";" > www/version.js
+      - run: npm ci
+      - name: Progetto Android
+        run: |
+          npx cap add android
+          find android/app/src/main/res -name splash.png -delete
+          cp -r android-res/. android/app/src/main/res/
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />|' android/app/src/main/AndroidManifest.xml
+          sed -i "s/versionCode 1$/versionCode $CODE/; s/versionName \"1.0\"/versionName \"$V\"/" android/app/build.gradle
+          sed -i 's|<item name="android:background">@null</item>|<item name="android:background">@null</item>\n        <item name="android:statusBarColor">#14532D</item>|' android/app/src/main/res/values/styles.xml
+          grep -n "versionCode\|versionName" android/app/build.gradle
+          npx cap sync android
+      - name: Compila
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Firma
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASS }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "::error::Manca il segreto KEYSTORE_B64 (vedi LEGGIMI)"; exit 1; fi
+          echo "$KS_B64" | base64 -d > eaf.jks
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk eaf-aligned.apk
+          "$BT/apksigner" sign --ks eaf.jks --ks-pass env:KS_PASS --ks-key-alias eatandfit --key-pass env:KS_PASS --out "EatAndFit-$V.apk" eaf-aligned.apk
+          "$BT/apksigner" verify --print-certs "EatAndFit-$V.apk" | head -3
+          rm -f eaf.jks
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EatAndFit-${{ env.V }}
+          path: EatAndFit-*.apk
+      - name: Pubblica la release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "EatAndFit-$V.apk" --title "EatAndFit $V" --notes-file NOVITA.md

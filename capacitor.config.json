@@ -1,0 +1,6 @@
+{
+  "appId": "it.roby5991.eatandfit",
+  "appName": "EatAndFit",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
