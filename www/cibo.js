@@ -135,7 +135,7 @@ function renderDiario() {
   $app.innerHTML = `
   <div class="bar">
     <h1>Alimentazione<span class="sub">${esc(d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" }))}</span></h1>
-    <button class="ib" data-a="gday" data-d="${g.iso}" title="Tutti i dati del giorno">📅</button></div>
+    <button class="ib" data-a="menu" title="Menu">⋯</button></div>
   <div class="gnav"><button class="btn ghost" data-a="di-move" data-n="-1">‹</button>
     <input class="e-in" type="date" id="di-date" value="${g.iso}">
     <button class="btn ghost" data-a="di-move" data-n="1">›</button></div>
@@ -201,7 +201,7 @@ function showAdd(meal) {
 }
 function foodRow(it, a, extra) {
   return `<button class="frow" data-a="${a}" ${extra}><span class="dn">${esc(it.name)}</span>
-    <span class="rs">${it.brand ? esc(it.brand) + " · " : ""}${n0(it.kcal)} kcal per ${esc(baseTxt(it))}${it.source === "Open Food Facts" ? " · OFF" : it.source === "Mio" ? " · mio" : ""}${it.uses ? " · ★" : ""}</span>${scoreBadges(it)}</button>`;
+    <span class="rs">${it.brand ? esc(it.brand) + " · " : ""}${n0(it.kcal)} kcal per ${esc(baseTxt(it))}${it.source === "Open Food Facts" ? " · OFF" : it.source === "Mio" ? " · mio" : it.source === "Roberto" ? " · da Roberto" : ""}${it.uses ? " · ★" : ""}</span>${scoreBadges(it)}</button>`;
 }
 async function searchLocal(q) {
   const seq = ++FA.seq, box = () => document.getElementById("fres");

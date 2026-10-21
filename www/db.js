@@ -291,3 +291,47 @@ async function restoreZip(file) {
   try { await metaSet("lastBackup", String(data.creato || "").slice(0, 10) || null); } catch {}
   return { record: COLS.reduce((a, c) => a + IDB.mem[c].size, 0), foto: n };
 }
+
+/* ---------- alimenti condivisi con Roberto ---------- */
+const FOODS_URL = "https://raw.githubusercontent.com/Roby5991/EatAndFit/main/db/alimenti.json";
+const SHARE_F = ["name", "brand", "barcode", "base", "unit", "kcal", "carb", "fat", "prot", "fiber", "sugar", "sodium", "serving", "serving_label", "nutriscore", "nova", "additivi", "off_chk"];
+const normK = (n, b) => (String(b || "") + "|" + String(n || "")).toLowerCase().replace(/\s+/g, " ").trim();
+/* scarica gli alimenti pubblicati da Roberto: aggiunge i nuovi, aggiorna i suoi non modificati, non tocca quelli inseriti o modificati qui */
+async function syncFoods() {
+  const url = (await metaGet("foodsUrl").catch(() => null)) || FOODS_URL;
+  const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+  if (r.status === 404) return { nuovi: 0, aggiornati: 0, totale: 0 };
+  if (!r.ok) throw new Error("download non riuscito (" + r.status + ")");
+  const txt = await r.text(), j = JSON.parse(txt);
+  if (j.app !== "EatAndFit" || !Array.isArray(j.items)) throw new Error("file alimenti non valido");
+  const sig = j.items.length + ":" + txt.length;
+  if (sig === (await metaGet("foodsSig").catch(() => null))) return { nuovi: 0, aggiornati: 0, totale: j.items.length, invariato: true };
+  const A = pb.collection("alimenti"), all = [...IDB.mem.alimenti.values()];
+  const byExt = new Map(all.filter((x) => x.ext).map((x) => [x.ext, x]));
+  const byCode = new Map(all.filter((x) => x.barcode).map((x) => [x.barcode, x]));
+  const byName = new Set(all.map((x) => normK(x.name, x.brand)));
+  let nuovi = 0, agg = 0;
+  for (const it of j.items) {
+    if (!it || !it.name || !it.id) continue;
+    const ext = "rob|" + it.id, o = {};
+    for (const f of SHARE_F) o[f] = it[f] ?? (["name", "brand", "barcode", "unit", "serving_label", "nutriscore", "off_chk"].includes(f) ? "" : f === "additivi" ? [] : 0);
+    const loc = byExt.get(ext);
+    if (loc) {
+      if (loc.source === "Roberto" && SHARE_F.some((f) => JSON.stringify(loc[f] ?? "") !== JSON.stringify(o[f] ?? ""))) {
+        if (o.barcode && byCode.has(o.barcode) && byCode.get(o.barcode).id !== loc.id) o.barcode = loc.barcode || "";
+        await A.update(loc.id, o); agg++;
+      }
+      continue;
+    }
+    if ((o.barcode && byCode.has(o.barcode)) || byName.has(normK(o.name, o.brand))) continue;   // ce l'hai già: resta il tuo
+    const rec = await A.create({ ...o, ext, source: "Roberto", uses: 0, last: "" });
+    if (rec.barcode) byCode.set(rec.barcode, rec); byName.add(normK(rec.name, rec.brand)); nuovi++;
+  }
+  await metaSet("foodsSig", sig); await metaSet("foodsSync", new Date().toISOString());
+  return { nuovi, aggiornati: agg, totale: j.items.length };
+}
+/* alimenti inseriti qui (a mano o trovati con il codice a barre), da mandare a Roberto */
+function myFoodsJson() {
+  const items = [...IDB.mem.alimenti.values()].filter((x) => x.source !== "Roberto").map((x) => { const o = {}; for (const f of SHARE_F) if (x[f] !== "" && x[f] != null) o[f] = x[f]; return o; });
+  return { app: "EatAndFit", tipo: "alimenti", da: "EatAndFit", creato: new Date().toISOString(), items };
+}

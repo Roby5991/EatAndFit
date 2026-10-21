@@ -421,6 +421,5 @@ body.withtabs .toast{bottom:calc(78px + env(safe-area-inset-bottom))}
 /* EatAndFit */
 :root{--navy:#14532D;--navy2:#166534;--accent:#15803D;--link:#15803D}
 @media (prefers-color-scheme: dark){:root{--accent:#16A34A;--link:#4ADE80}}
-.bar [data-a=gday]{display:none}
 .tabbar.t3{grid-template-columns:repeat(3,1fr)}
 .pwbad.upd .btn,.pwbad .btn{margin-top:8px}

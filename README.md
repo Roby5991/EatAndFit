@@ -11,6 +11,7 @@ L'app controlla da sola se c'è una versione nuova e propone l'aggiornamento: i 
 - **Alimentazione**: pasti, ricerca tra i tuoi alimenti, codice a barre con la fotocamera (Open Food Facts), lettura dei valori dalla foto dell'etichetta (sul telefono), obiettivi per giorno della settimana, Nutri-Score / NOVA / additivi, fibre-zuccheri-sodio rispetto alle linee guida LARN
 - **Peso e foto**: pesate, grafico, media 7 giorni, foto dei check e confronto tra due date
 - **Backup**: ⋯ → Fai il backup → condividi su Drive; ⋯ → Ripristina da un backup
+- **Alimenti di Roberto**: ogni giorno l'app scarica `db/alimenti.json` (pubblicato dal NAS di Roberto) e aggiunge gli alimenti nuovi; quelli inseriti o modificati sul telefono non vengono mai toccati. ⋯ → "Manda i miei alimenti a Roberto" crea il file da mandargli.
 
 ## Nuova versione (per chi mantiene l'app)
 1. Modifica il codice in `www/` e scrivi le novità in `NOVITA.md`

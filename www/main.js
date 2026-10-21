@@ -328,26 +328,42 @@ async function blobToB64(b) {
   const s = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => ko(r.error); r.readAsDataURL(b); });
   return String(s).slice(String(s).indexOf(",") + 1);
 }
-async function exportBackup() {
-  const prog = (t) => { $sheet.innerHTML = `<div class="in"><h2>Backup</h2><div class="prog"><span>${t}</span><i style="width:60%"></i></div></div>`; $sheet.hidden = false; };
-  prog("Preparo il backup…");
-  const blob = await backupBlob(), name = `EatAndFit-backup-${todayISO()}.zip`;
+async function shareFile(blob, name, title) {
   if (NATIVE && window.Capacitor.Plugins?.Filesystem && window.Capacitor.Plugins?.Share) {
     const { Filesystem, Share } = window.Capacitor.Plugins, CH = 3 * 1024 * 1024;
-    prog("Salvo il file…");
     for (let i = 0; i < blob.size; i += CH) {
       const data = await blobToB64(blob.slice(i, i + CH));
       if (i === 0) await Filesystem.writeFile({ path: name, data, directory: "CACHE" }); else await Filesystem.appendFile({ path: name, data, directory: "CACHE" });
     }
+    if (!blob.size) await Filesystem.writeFile({ path: name, data: "", directory: "CACHE" });
     const { uri } = await Filesystem.getUri({ path: name, directory: "CACHE" });
-    closeSheet();
-    await Share.share({ title: "Backup EatAndFit", text: name, url: uri, dialogTitle: "Salva il backup (es. su Drive)" });
-  } else {
-    const file = new File([blob], name, { type: "application/zip" });
-    closeSheet();
-    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "Backup EatAndFit" });
-    else { const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+    await Share.share({ title, text: name, url: uri, dialogTitle: title });
+    return;
   }
+  const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
+  if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title });
+  else { const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+}
+async function sendFoods() {
+  const d = myFoodsJson();
+  if (!d.items.length) return toast("Non hai ancora inserito alimenti tuoi");
+  await shareFile(new Blob([JSON.stringify(d)], { type: "application/json" }), `alimenti-EatAndFit-${todayISO()}.json`, "Manda i tuoi alimenti a Roberto");
+  toast(`${d.items.length} alimenti pronti da mandare`, 3000);
+}
+async function foodsUpdate(manual) {
+  try {
+    const r = await syncFoods();
+    if (r.nuovi || r.aggiornati) toast(`Alimenti di Roberto: ${r.nuovi} nuovi${r.aggiornati ? ", " + r.aggiornati + " aggiornati" : ""}`, 3500);
+    else if (manual) toast(r.totale ? "Alimenti di Roberto già aggiornati" : "Roberto non ha ancora pubblicato alimenti");
+  } catch (e) { if (manual) toast("Aggiornamento alimenti non riuscito: " + (e.message || e)); }
+}
+async function exportBackup() {
+  const prog = (t) => { $sheet.innerHTML = `<div class="in"><h2>Backup</h2><div class="prog"><span>${t}</span><i style="width:60%"></i></div></div>`; $sheet.hidden = false; };
+  prog("Preparo il backup…");
+  const blob = await backupBlob(), name = `EatAndFit-backup-${todayISO()}.zip`;
+  prog("Salvo il file…");
+  await shareFile(new Blob([blob], { type: "application/zip" }), name, "Salva il backup (es. su Drive)");
+  closeSheet();
   await metaSet("lastBackup", todayISO());
   toast(`Backup pronto (${(blob.size / 1048576).toFixed(1)} MB)`, 3000);
   if (S.view === "hub") { await loadHub(); renderHub(); }
@@ -387,7 +403,9 @@ function showMenu() {
     <div class="rs">Versione ${esc(APP_VERSION)} · i dati sono salvati solo su questo telefono.</div>
     <button class="btn" data-a="bk-exp">💾 Fai il backup (salva su Drive)</button>
     <label class="btn ghost hfile">⤒ Ripristina da un backup<input type="file" id="bk-file" accept=".zip,application/zip,application/octet-stream" hidden></label>
-    <button class="btn ghost" data-a="upd-check">🔄 Controlla aggiornamenti</button>
+    <button class="btn ghost" data-a="eaf-sync">🍏 Aggiorna gli alimenti di Roberto</button>
+    <button class="btn ghost" data-a="eaf-send">📤 Manda i miei alimenti a Roberto</button>
+    <button class="btn ghost" data-a="upd-check">🔄 Controlla aggiornamenti dell'app</button>
     <button class="btn ghost" data-a="close">Chiudi</button></div>`;
   $sheet.hidden = false;
 }
@@ -440,6 +458,8 @@ document.addEventListener("click", async (ev) => {
       case "chk-del": if (!confirm("Eliminare il check con tutte le sue foto?")) return; await pb.collection("checks").delete(id); closeSheet(); await loadChecks(); render(); toast("Check eliminato"); return;
       case "bk-exp": return exportBackup();
       case "upd-check": closeSheet(); return checkUpdate(true);
+      case "eaf-sync": closeSheet(); return foodsUpdate(true);
+      case "eaf-send": closeSheet(); return sendFoods();
       case "upd-go": return showUpdate();
       case "upd-dl": closeSheet(); location.href = S.upd.url; return;
     }
@@ -464,7 +484,7 @@ if (NATIVE && window.Capacitor.Plugins?.App) {
   catch (e) { $app.innerHTML = `<div class="empty">Impossibile aprire i dati del telefono: ${esc(e.message || e)}</div>`; return; }
   await go("hub");
   const lastChk = await metaGet("updChk").catch(() => null);
-  if (lastChk !== todayISO()) { await metaSet("updChk", todayISO()).catch(() => {}); checkUpdate(false); }
-  else checkUpdate(false);
+  checkUpdate(false);
+  if (lastChk !== todayISO()) { await metaSet("updChk", todayISO()).catch(() => {}); foodsUpdate(false); }   // alimenti di Roberto: una volta al giorno
   if ("serviceWorker" in navigator && !NATIVE) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

@@ -5,3 +5,4 @@ Prima versione di EatAndFit.
 - Nutri-Score, NOVA e additivi; fibre, zuccheri e sodio rispetto alle linee guida
 - Peso con grafico e media su 7 giorni, foto dei check con confronto
 - Backup su Drive e ripristino; aggiornamenti dall'app
+- Alimenti di Roberto scaricati ogni giorno; invio dei propri alimenti a Roberto
