@@ -15,7 +15,7 @@ L'app controlla da sola se c'è una versione nuova e propone l'aggiornamento: i 
 
 ## Nuova versione (per chi mantiene l'app)
 1. Modifica il codice in `www/` e scrivi le novità in `NOVITA.md`
-2. Crea un tag `vX.Y.Z` (più alto del precedente) e caricalo: GitHub compila l'APK e lo pubblica in Releases
+2. Scrivi il nuovo numero (più alto del precedente, es. 1.0.1) nel file `VERSIONE`: GitHub compila l'APK e lo pubblica in Releases come `v1.0.1`
 3. Segreti necessari (Settings → Secrets and variables → Actions): `KEYSTORE_B64` (la chiave di firma in base64) e `KEYSTORE_PASS`.
    **La chiave va conservata**: senza la stessa chiave gli aggiornamenti non si installano sopra la versione precedente.
 

@@ -1,10 +1,11 @@
-# Compila l'APK di EatAndFit e lo pubblica come release.
-# Nuova versione: crea un tag "vX.Y.Z" (es. v1.0.1). Le novità della release vengono da NOVITA.md.
+# Compila l'APK di EatAndFit e lo pubblica come release "vX.Y.Z".
+# Nuova versione: cambia il numero nel file VERSIONE (es. 1.0.1) e scrivi le novità in NOVITA.md.
 # Segreti richiesti (Settings → Secrets and variables → Actions): KEYSTORE_B64 e KEYSTORE_PASS.
 name: Compila APK
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["VERSIONE"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -22,8 +23,11 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Numero di versione
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.$GITHUB_RUN_NUMBER"; fi
+          V="$(tr -d ' \r\n' < VERSIONE)"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "::error::La release v$V esiste già: aumenta il numero in VERSIONE"; exit 1; fi
           IFS=. read -r MA MI PA <<< "$V"
           echo "V=$V" >> "$GITHUB_ENV"
           echo "CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))" >> "$GITHUB_ENV"
@@ -59,7 +63,6 @@ jobs:
           name: EatAndFit-${{ env.V }}
           path: EatAndFit-*.apk
       - name: Pubblica la release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "EatAndFit-$V.apk" --title "EatAndFit $V" --notes-file NOVITA.md
+        run: gh release create "v$V" "EatAndFit-$V.apk" --target "$GITHUB_SHA" --title "EatAndFit $V" --notes-file NOVITA.md
